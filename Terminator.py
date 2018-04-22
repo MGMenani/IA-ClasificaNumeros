@@ -1,4 +1,4 @@
-##################Imports section###################
+################## Imports section ###################
 # -*- coding: cp1252 -*-
 import numpy as np
 import matplotlib.pyplot as plt
@@ -14,24 +14,24 @@ def load_MNIST_Data():
     train_img, test_img, train_lbl, test_lbl = train_test_split(mnist.data, mnist.target, test_size=1/7.0, random_state=0)
     return train_img, train_lbl, test_img, test_lbl
 
-################# Neural sectionz####################
+################# Neural section ####################
 
 
 class Neural_Network(object):
     def __init__(self):
-        self.inputSize = 784                
+        self.inputSize = 784                #Imágenes de 28x28 
         self.outputSize = 10                #números del 0 al 9
         self.hiddenSize1 = 512              #Primera capa de 512
         self.hiddenSize2 = 128              #Segunda capa de 128
 
-        #inicializo el W
+        #inicializo el W con pesos aleatorios 
         self.W1 = np.random.randn(self.inputSize, self.hiddenSize1)     # (784, 512) entrada
         self.W2 = np.random.randn(self.hiddenSize1, self.hiddenSize2)   # (512, 128) primera capa
         self.W3 = np.random.randn(self.hiddenSize2, self.outputSize)    # (128, 10)  segunda capa
         
     def forward(self, X):
         self.z = np.dot(X, self.W1)
-        self.z2 = self.relu(self.z)                     # activation function capa 2
+        self.z2 = self.relu(self.z)                     # activation function capa 1
         self.z3 = np.dot(self.z2,self.W2) 
         self.z4 = self.relu(self.z3)                    # activation function capa 2
         self.z5 = np.dot(self.z4,self.W3)
@@ -43,8 +43,26 @@ class Neural_Network(object):
     def relu(self,x):
         return np.maximum(x, 0, x)
 
+    
+    #https://deepnotes.io/softmax-crossentropy
+    def softmax(self, X):
+        exps = np.exp(X)                      #calcula cada e**Xi
+        return exps / np.sum(exps)
+
+    def cross_entropy(self,X,y):
+        """
+        X is the output from fully connected layer (num_examples x num_classes)
+        y is labels (num_examples x 1)
+        """
+        m = y.shape[0]
+        p = self.softmax(X)
+        log_likelihood = -np.log(p[range(m),y])
+        loss = np.sum(log_likelihood) / m
+        return loss
+
+
     #Aun no funciona
-    def cross_entropy(predictions, targets, epsilon=1e-12):
+    '''def cross_entropy(predictions, targets, epsilon=1e-12):
         """
         Computes cross entropy between targets (encoded as one-hot vectors)
         and predictions. 
@@ -56,7 +74,7 @@ class Neural_Network(object):
         N = predictions.shape[0]
         ce = -np.sum(np.sum(targets*np.log(predictions+1e-9)))/N
         return ce
-
+    '''
     
 #Así llaman a cross entropy loss en el ejemplo que encontre
 """
@@ -82,14 +100,9 @@ def Train():
     test_X = data[2]        #Imagenes de prueba (10000)
     test_Y = data[3]        #Labels de prueba (10000)
 
-    #X = train_X[:100]       #Por el momento se toman las 100 primeras imagenes, debe ser aleatorio
-    #Y = train_Y[:100]
-
-    X = random.sample(train_X,cantTrain)                #Generar lista random sin repetir de imágenes para testing
-    Y = []
-    for i in range(len(X)):
-        i,j = np.where(train_X == X[i])                 #Indice de un elemento en una matriz
-        Y.append(train_Y[i[0]])                         #Label del elemento 
+    testRandom = random.sample(range(len(train_X)),cantTrain) #toma los índices aleatoriamente para las imágenes de testing
+    X = [train_X[i] for i in testRandom]                      #Datos de testing con los índices anteriores
+    Y = [train_Y[i] for i in testRandom]                      #labels de los datos anteriores
 
     Y_vectorizado = np.zeros((len(X), len(X[0])))       #Creacion de labels vectorizados para mandarlos a cross-entropy
     for i in range(len(Y)):                     
@@ -98,9 +111,15 @@ def Train():
     NN = Neural_Network()
     output = NN.forward(X)
 
+
+
+    #print "Predicted Output: \n" + str(output) 
+    #print "Actual Output: \n" + str(Y) 
+
+
     #No funciona aun
-    #ce = NN.cross_entropy(output, Y_vectorizado)
-    #print(ce)
+    ce = NN.cross_entropy(output, Y_vectorizado)
+    print ce
 
     
 Train()
