@@ -36,14 +36,28 @@ class Neural_Network(object):
         self.z4 = self.relu(self.z3)                    # activation function capa 2
         self.z5 = np.dot(self.z4,self.W3)
         output = self.relu(self.z5)                     # final activation function
-            
-        print(output.shape)
-        return output 
+        return output
+
+    def backward(self, X, y, output):
+        self.output_error = y - output
+        self.output_delta = self.output_error * self.derivate_relu(output)
+
+        self.z4_error = self.output_delta.dot(self.W3.T)
+        self.z4_delta = self.z4_error*self.derivate_relu(self.z4)
+        self.z2_error = self.z4_delta.dot(self.W2.T)
+        self.z2_delta = self.z2_error*self.derivate_relu(self.z2)
+
+        self.W1 += X.T.dot(self.z2_delta)                                    #ajusta pesos (input->hidden1)
+        self.W2 += self.z2.T.dot(self.z4_delta)                              #ajusta pesos (hidden1->hidden2)
+        self.W3 += self.z4.T.dot(self.output_delta)                          #ajusta pesos (hidden2->output)
+        
 
     def relu(self,x):
         return np.maximum(x, 0, x)
 
-    
+    def derivate_relu(self,x):
+        return np.heaviside(x, 0)
+        
     #https://deepnotes.io/softmax-crossentropy
     def softmax(self, X):
         exps = np.exp(X)                      #calcula cada e**Xi (de cada elemento de la matriz)
@@ -60,33 +74,17 @@ class Neural_Network(object):
         loss = np.sum(log_likelihood) / m
         return loss
 
-
-    #Aun no funciona
-    '''def cross_entropy(predictions, targets, epsilon=1e-12):
-        """
-        Computes cross entropy between targets (encoded as one-hot vectors)
-        and predictions. 
-        Input: predictions (N, k) ndarray
-               targets (N, k) ndarray        
-        Returns: scalar
-        """
-        predictions = np.clip(predictions, epsilon, 1. - epsilon)
-        N = predictions.shape[0]
-        ce = -np.sum(np.sum(targets*np.log(predictions+1e-9)))/N
-        return ce
-    '''
-    
-#Así llaman a cross entropy loss en el ejemplo que encontre
-"""
-predictions = np.array([[0.25,0.25,0.25,0.25],
-                        [0.01,0.01,0.01,0.96]])
-targets = np.array([[0,0,0,1],
-                   [0,0,0,1]])
-ans = 0.71355817782  #Correct answer
-x = cross_entropy(predictions, targets)
-print(np.isclose(x,ans))
-"""
-
+def getRandomTesting(train_X,train_Y, porcentage):
+    test_data = []
+    test_label = []
+    validation_data = []
+    validation_label = []
+    testDataSelected = random.sample(range(len(train_X)),int(len(train_X)*porcentage))     #Selecciona el 80 por ciento para entrenar
+    test_data = np.take(train_X, testDataSelected, 0)
+    test_label = np.take(train_Y, testDataSelected, 0)
+    validation_data = np.delete(train_X, testDataSelected, 0)
+    validation_label = np.delete(train_Y, testDataSelected, 0)
+    return test_data, test_label, validation_data, validation_label
 
 def Train():
     cantTrain = 35          #Número de imágenes del train que se usarán como test
@@ -94,35 +92,43 @@ def Train():
     data = load_MNIST_Data()
     train_X = data[0]       #imagenes de entrenamiento (60000)
     train_Y = data[1]       #Labeld de entrenamiento (60000)
-
     test_X = data[2]        #Imagenes de prueba (10000)
     test_Y = data[3]        #Labels de prueba (10000)
 
-    testRandom = random.sample(range(len(train_X)),cantTrain) #toma los índices aleatoriamente para las imágenes de testing
-    X = [train_X[i] for i in testRandom]                      #Datos de testing con los índices anteriores
-    Y = [train_Y[i] for i in testRandom]                      #labels de los datos anteriores
+    #se calcula el 80 del total de los datos,
+    #retorna una lista con imagenes de train(80%) y sus labels y imagenes de validacion(20%) y sus labels
+    dataPorcentage = getRandomTesting(train_X,train_Y,0.8)
+    train_X = dataPorcentage[0]
+    train_Y = dataPorcentage[1]
+    validation_X = dataPorcentage[2]                    
+    validation_Y = dataPorcentage[3]  
+    
+    trainRandom = random.sample(range(len(train_X)),cantTrain)                       #toma los índices aleatoriamente para las imágenes de training
+    X = np.array([train_X[i] for i in trainRandom])                                  #Datos de testing con los índices anteriores
+    Y = [train_Y[i] for i in trainRandom]                                          #labels de los datos anteriores
 
-    #print X
+    #Elimina las posiciones que ya fueron utilizadas
+    train_X = np.delete(train_X, trainRandom, 0)
+    train_Y = np.delete(train_Y, trainRandom, 0)
 
-    Y_vectorizado = np.zeros((len(Y), 10))       #Creacion de labels vectorizados para mandarlos a cross-entropy (10 columnas->10 clases)
     #One Hot Encoding
+    Y_vectorizado = np.zeros((len(Y), 10))              #Creacion de labels vectorizados para mandarlos a cross-entropy (10 columnas->10 clases)
     for i in range(len(Y)):                     
         Y_vectorizado[i][int(Y[i])] = 1                 #Se pone 1.0 en la posicion del vector
 
     NN = Neural_Network()
     output = NN.forward(X)
+
+    NN.backward(X,Y_vectorizado,output)
+
     
-    #print Y_vectorizado
-
-    output = output/np.amax(output, axis=0)
-    #print "Predicted Output: \n" + str(output) 
-    #print "Actual Output: \n" + str(Y) 
-
-
-    #No funciona aun
-
+    #Calcular el Loss al final de cada entrenamiento
+    output = output + 0.001                             #evitar división entre 0 se le suma a todos 0.001
     output = output/np.amax(output, axis=0)
     ce = NN.cross_entropy(output, Y_vectorizado)
+
+    
+
     print ce
 
     
