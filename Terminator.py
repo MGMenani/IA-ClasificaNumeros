@@ -46,7 +46,7 @@ class Neural_Network(object):
     
     #https://deepnotes.io/softmax-crossentropy
     def softmax(self, X):
-        exps = np.exp(X)                      #calcula cada e**Xi
+        exps = np.exp(X)                      #calcula cada e**Xi (de cada elemento de la matriz)
         return exps / np.sum(exps)
 
     def cross_entropy(self,X,y):
@@ -56,7 +56,7 @@ class Neural_Network(object):
         """
         m = y.shape[0]
         p = self.softmax(X)
-        log_likelihood = -np.log(p[range(m),y])
+        log_likelihood = -np.log(p)#[range(m),y])
         loss = np.sum(log_likelihood) / m
         return loss
 
@@ -95,8 +95,6 @@ def Train():
     train_X = data[0]       #imagenes de entrenamiento (60000)
     train_Y = data[1]       #Labeld de entrenamiento (60000)
 
-    print train_Y[6]
-
     test_X = data[2]        #Imagenes de prueba (10000)
     test_Y = data[3]        #Labels de prueba (10000)
 
@@ -104,20 +102,26 @@ def Train():
     X = [train_X[i] for i in testRandom]                      #Datos de testing con los índices anteriores
     Y = [train_Y[i] for i in testRandom]                      #labels de los datos anteriores
 
-    Y_vectorizado = np.zeros((len(X), len(X[0])))       #Creacion de labels vectorizados para mandarlos a cross-entropy
+    #print X
+
+    Y_vectorizado = np.zeros((len(Y), 10))       #Creacion de labels vectorizados para mandarlos a cross-entropy (10 columnas->10 clases)
+    #One Hot Encoding
     for i in range(len(Y)):                     
         Y_vectorizado[i][int(Y[i])] = 1                 #Se pone 1.0 en la posicion del vector
 
     NN = Neural_Network()
     output = NN.forward(X)
+    
+    #print Y_vectorizado
 
-
-
+    output = output/np.amax(output, axis=0)
     #print "Predicted Output: \n" + str(output) 
     #print "Actual Output: \n" + str(Y) 
 
 
     #No funciona aun
+
+    output = output/np.amax(output, axis=0)
     ce = NN.cross_entropy(output, Y_vectorizado)
     print ce
 
