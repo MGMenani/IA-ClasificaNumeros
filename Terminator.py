@@ -36,14 +36,14 @@ class Neural_Network(object):
         self.z4 = self.relu(self.z3)                    # activation function capa 2
         self.z5 = np.dot(self.z4,self.W3)
         output = self.relu(self.z5)                     # final activation function
-            
-        print(output.shape)
         return output 
 
     def relu(self,x):
         return np.maximum(x, 0, x)
 
-    
+    def derivate_relu(self,x):
+        return np.heaviside(x, 0)
+        
     #https://deepnotes.io/softmax-crossentropy
     def softmax(self, X):
         exps = np.exp(X)                      #calcula cada e**Xi (de cada elemento de la matriz)
