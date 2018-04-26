@@ -34,9 +34,21 @@ class Neural_Network(object):
         self.z2 = self.relu(self.z)                     # activation function capa 1
         self.z3 = np.dot(self.z2,self.W2) 
         self.z4 = self.relu(self.z3)                    # activation function capa 2
-        self.z5 = np.dot(self.z4,self.W3)
-        output = self.relu(self.z5)                     # final activation function
-        return output 
+        self.z5 = np.dot(self.z4,self.W3)                    # final activation function
+        return self.z5
+
+    def backward(self, X, loss, output):
+        self.output_delta = loss * self.derivate_relu(output)
+        
+        self.z4_error = self.output_delta.dot(self.W3.T)
+        self.z4_delta = self.z4_error*self.derivate_relu(self.z4)
+
+        self.z2_error = self.z4_delta.dot(self.W2.T)
+        self.z2_delta = self.z2_error*self.derivate_relu(self.z2)
+        
+        self.W1 += X.T.dot(self.z2_delta)                                    #ajusta pesos (input->hidden1)
+        self.W2 += self.z2.T.dot(self.z4_delta)                              #ajusta pesos (hidden1->hidden2)
+        self.W3 += self.z4.T.dot(self.output_delta)                          #ajusta pesos (hidden2->output)
 
     def relu(self,x):
         return np.maximum(x, 0, x)
@@ -46,8 +58,10 @@ class Neural_Network(object):
         
     #https://deepnotes.io/softmax-crossentropy
     def softmax(self, X):
+        X -= np.max(X)
         exps = np.exp(X)                      #calcula cada e**Xi (de cada elemento de la matriz)
-        return exps / np.sum(exps)
+        suma = (np.sum(exps,1) + np.finfo(float).eps)
+        return exps / suma[:,None]
 
     def cross_entropy(self,X,y):
         """
@@ -56,7 +70,7 @@ class Neural_Network(object):
         """
         m = y.shape[0]
         p = self.softmax(X)
-        log_likelihood = -np.log(p)#[range(m),y])
+        log_likelihood = -np.log(p)
         loss = np.sum(log_likelihood) / m
         return loss
 
@@ -88,34 +102,39 @@ def Train():
     train_Y = dataPorcentage[1]
     validation_X = dataPorcentage[2]                    
     validation_Y = dataPorcentage[3]  
-    
-    trainRandom = random.sample(range(len(train_X)),cantTrain)                       #toma los índices aleatoriamente para las imágenes de testing
-    X = [train_X[i] for i in trainRandom]                                            #Datos de testing con los índices anteriores
-    Y = [train_Y[i] for i in trainRandom]                                            #labels de los datos anteriores
-
-    #Elimina las posiciones que ya fueron utilizadas
-    train_X = np.delete(train_X, trainRandom, 0)
-    train_Y = np.delete(train_Y, trainRandom, 0)
-
-    Y_vectorizado = np.zeros((len(Y), 10))              #Creacion de labels vectorizados para mandarlos a cross-entropy (10 columnas->10 clases)
-    #One Hot Encoding
-    for i in range(len(Y)):                     
-        Y_vectorizado[i][int(Y[i])] = 1                 #Se pone 1.0 en la posicion del vector
 
     NN = Neural_Network()
-    output = NN.forward(X)
     
-    #print Y_vectorizado
+    for i in range(5):
+        trainRandom = random.sample(range(len(train_X)),cantTrain)                       #toma los índices aleatoriamente para las imágenes de training
+        X = np.array([train_X[i] for i in trainRandom])                                  #Datos de testing con los índices anteriores
+        Y = [train_Y[i] for i in trainRandom]                                          #labels de los datos anteriores
 
-    #print "Predicted Output: \n" + str(output) 
-    #print "Actual Output: \n" + str(Y) 
+        #Elimina las posiciones que ya fueron utilizadas
+        train_X = np.delete(train_X, trainRandom, 0)
+        train_Y = np.delete(train_Y, trainRandom, 0)
+
+        #One Hot Encoding
+        Y_vectorizado = np.zeros((len(Y), 10))              #Creacion de labels vectorizados para mandarlos a cross-entropy (10 columnas->10 clases)
+        for i in range(len(Y)):                     
+            Y_vectorizado[i][int(Y[i])] = 1                 #Se pone 1.0 en la posicion del vector
+            
+
+        output = NN.forward(X)
+
+        #Calcular el Loss al final de cada entrenamiento
+        #print("Output")
+        #print(output)
+        output = output/ (np.max(output, axis=0) + np.finfo(float).eps)
+        ce = NN.cross_entropy(output, Y_vectorizado)
+        print ce
+
+        NN.backward(X, ce, output)
+
+    
+    
 
 
-    #No funciona aun
-
-    output = output/np.amax(output, axis=0)
-    ce = NN.cross_entropy(output, Y_vectorizado)
-    print ce
 
     
 Train()
