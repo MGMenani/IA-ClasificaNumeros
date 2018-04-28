@@ -28,17 +28,19 @@ class Neural_Network(object):
         self.W1 = np.random.randn(self.inputSize, self.hiddenSize1)     # (784, 512) entrada
         self.W2 = np.random.randn(self.hiddenSize1, self.hiddenSize2)   # (512, 128) primera capa
         self.W3 = np.random.randn(self.hiddenSize2, self.outputSize)    # (128, 10)  segunda capa
+        self.y = None
         
     def forward(self, X):
         self.z = np.dot(X, self.W1)
         self.z2 = self.relu(self.z)                     # activation function capa 1
         self.z3 = np.dot(self.z2,self.W2) 
         self.z4 = self.relu(self.z3)                    # activation function capa 2
-        self.z5 = np.dot(self.z4,self.W3)                    # final activation function
-        return self.z5
+        self.z5 = np.dot(self.z4,self.W3)               # final activation function
+        output = self.softmax(self.z5)
+        return output
 
     def backward(self, X, loss, output):
-        self.output_delta = loss * self.derivate_relu(output)
+        self.output_delta = loss * self.Cross_Entropy_Derivate(output, self.y)
         
         self.z4_error = self.output_delta.dot(self.W3.T)
         self.z4_delta = self.z4_error*self.derivate_relu(self.z4)
@@ -48,7 +50,7 @@ class Neural_Network(object):
         
         self.W1 += X.T.dot(self.z2_delta)                                    #ajusta pesos (input->hidden1)
         self.W2 += self.z2.T.dot(self.z4_delta)                              #ajusta pesos (hidden1->hidden2)
-        self.W3 += self.z4.T.dot(self.output_delta)                          #ajusta pesos (hidden2->output)
+        self.W3 += self.z4.T.dot(self.output_delta)                          #ajusta pesos (hidden2->output) 
 
     def relu(self,x):
         return np.maximum(x, 0, x)
@@ -59,17 +61,30 @@ class Neural_Network(object):
     #https://deepnotes.io/softmax-crossentropy
     def softmax(self, X):
         X -= np.max(X)
-        exps = np.exp(X)                      #calcula cada e**Xi (de cada elemento de la matriz)
-        suma = (np.sum(exps,1) + np.finfo(float).eps)
+        exps = np.exp(X) + np.finfo(float).eps                     #calcula cada e**Xi (de cada elemento de la matriz)
+        suma = np.sum(exps,1) 
         return exps / suma[:,None]
 
-    def cross_entropy(self,X,y):
+    def Cross_Entropy_Derivate_Vector(self, s, y):
+        xi = np.argmax(self.y)
+        yi = s[xi]
+        s = -s*s[xi]
+        s[xi] = yi*(1-yi)
+        return s
+        
+    def Cross_Entropy_Derivate(self,x, y):
+        for i in range(len(x)):
+            x[i] = self.Cross_Entropy_Derivate_Vector(x[i],y[i])
+        #print(x)
+        return x
+        
+    
+    def cross_entropy(self,p,y):
         """
         X is the output from fully connected layer (num_examples x num_classes)
         y is labels (num_examples x 1)
         """
         m = y.shape[0]
-        p = self.softmax(X)
         log_likelihood = -np.log(p)
         loss = np.sum(log_likelihood) / m
         return loss
@@ -87,7 +102,7 @@ def getRandomTesting(train_X,train_Y, porcentage):
     return test_data, test_label, validation_data, validation_label
 
 def Train():
-    cantTrain = 35          #Número de imágenes del train que se usarán como test
+    cantTrain = 35         #Número de imágenes del train que se usarán como test
     
     data = load_MNIST_Data()
     train_X = data[0]       #imagenes de entrenamiento (60000)
@@ -104,11 +119,10 @@ def Train():
     validation_Y = dataPorcentage[3]  
 
     NN = Neural_Network()
-    
-    for i in range(5):
+    for i in range(1000):
         trainRandom = random.sample(range(len(train_X)),cantTrain)                       #toma los índices aleatoriamente para las imágenes de training
         X = np.array([train_X[i] for i in trainRandom])                                  #Datos de testing con los índices anteriores
-        Y = [train_Y[i] for i in trainRandom]                                          #labels de los datos anteriores
+        Y = [train_Y[i] for i in trainRandom]                                            #labels de los datos anteriores
 
         #Elimina las posiciones que ya fueron utilizadas
         train_X = np.delete(train_X, trainRandom, 0)
@@ -118,18 +132,19 @@ def Train():
         Y_vectorizado = np.zeros((len(Y), 10))              #Creacion de labels vectorizados para mandarlos a cross-entropy (10 columnas->10 clases)
         for i in range(len(Y)):                     
             Y_vectorizado[i][int(Y[i])] = 1                 #Se pone 1.0 en la posicion del vector
-            
-
+        NN.y = Y_vectorizado
+        #print(NN.y)
+    
         output = NN.forward(X)
 
-        #Calcular el Loss al final de cada entrenamiento
-        #print("Output")
-        #print(output)
-        output = output/ (np.max(output, axis=0) + np.finfo(float).eps)
+        print("Forward")
+        print(output)
+
         ce = NN.cross_entropy(output, Y_vectorizado)
         print ce
-
+        
         NN.backward(X, ce, output)
+
 
     
     
