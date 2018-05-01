@@ -3,6 +3,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import random
+from math import sqrt
+from sklearn.preprocessing import normalize 
 
 from sklearn.datasets import fetch_mldata
 mnist = fetch_mldata('MNIST original')
@@ -25,9 +27,9 @@ class Neural_Network(object):
         self.hiddenSize2 = 128              #Segunda capa de 128
 
         #inicializo el W con pesos aleatorios 
-        self.W1 = np.random.randn(self.inputSize, self.hiddenSize1)     # (784, 512) entrada
-        self.W2 = np.random.randn(self.hiddenSize1, self.hiddenSize2)   # (512, 128) primera capa
-        self.W3 = np.random.randn(self.hiddenSize2, self.outputSize)    # (128, 10)  segunda capa
+        self.W1 = np.random.randn(self.inputSize, self.hiddenSize1) * sqrt(2.0/self.inputSize)# (784, 512) entrada
+        self.W2 = np.random.randn(self.hiddenSize1, self.hiddenSize2) * sqrt(2.0/self.hiddenSize1)   # (512, 128) primera capa
+        self.W3 = np.random.randn(self.hiddenSize2, self.outputSize) * sqrt(2.0/self.hiddenSize2)   # (128, 10)  segunda capa
         self.y = None
         
     def forward(self, X):
@@ -36,11 +38,12 @@ class Neural_Network(object):
         self.z3 = np.dot(self.z2,self.W2) 
         self.z4 = self.relu(self.z3)                    # activation function capa 2
         self.z5 = np.dot(self.z4,self.W3)               # final activation function
-        output = self.softmax(self.z5)
+        output = self.softmax(normalize(self.z5, norm='l2'))
+        print(output)
         return output
 
     def backward(self, X, loss, output):
-        self.output_delta = loss * self.Cross_Entropy_Derivate(output, self.y)
+        self.output_delta = loss * ((-1/output)*(self.Cross_Entropy_Derivate(output, self.y)))
         
         self.z4_error = self.output_delta.dot(self.W3.T)
         self.z4_delta = self.z4_error*self.derivate_relu(self.z4)
@@ -50,8 +53,12 @@ class Neural_Network(object):
         
         self.W1 += X.T.dot(self.z2_delta)                                    #ajusta pesos (input->hidden1)
         self.W2 += self.z2.T.dot(self.z4_delta)                              #ajusta pesos (hidden1->hidden2)
-        self.W3 += self.z4.T.dot(self.output_delta)                          #ajusta pesos (hidden2->output) 
-
+        self.W3 += self.z4.T.dot(self.output_delta)                          #ajusta pesos (hidden2->output)
+        
+        self.W1 = normalize(self.W1, norm='l2')
+        self.W2 = normalize(self.W2, norm='l2')
+        self.W3 = normalize(self.W3, norm='l2')
+        
     def relu(self,x):
         return np.maximum(x, 0, x)
 
@@ -75,15 +82,10 @@ class Neural_Network(object):
     def Cross_Entropy_Derivate(self,x, y):
         for i in range(len(x)):
             x[i] = self.Cross_Entropy_Derivate_Vector(x[i],y[i])
-        #print(x)
         return x
         
     
     def cross_entropy(self,p,y):
-        """
-        X is the output from fully connected layer (num_examples x num_classes)
-        y is labels (num_examples x 1)
-        """
         m = y.shape[0]
         log_likelihood = -np.log(p)
         loss = np.sum(log_likelihood) / m
@@ -119,7 +121,7 @@ def Train():
     validation_Y = dataPorcentage[3]  
 
     NN = Neural_Network()
-    for i in range(1000):
+    for i in range(20):
         trainRandom = random.sample(range(len(train_X)),cantTrain)                       #toma los índices aleatoriamente para las imágenes de training
         X = np.array([train_X[i] for i in trainRandom])                                  #Datos de testing con los índices anteriores
         Y = [train_Y[i] for i in trainRandom]                                            #labels de los datos anteriores
@@ -133,15 +135,17 @@ def Train():
         for i in range(len(Y)):                     
             Y_vectorizado[i][int(Y[i])] = 1                 #Se pone 1.0 en la posicion del vector
         NN.y = Y_vectorizado
-        #print(NN.y)
     
         output = NN.forward(X)
 
         print("Forward")
-        print(output)
+        #print(output)
 
         ce = NN.cross_entropy(output, Y_vectorizado)
         print ce
+
+        #output = normalize(output, norm='max')
+        #output = output/np.amax(output, axis=0)
         
         NN.backward(X, ce, output)
 
@@ -153,3 +157,4 @@ def Train():
 
     
 Train()
+        
