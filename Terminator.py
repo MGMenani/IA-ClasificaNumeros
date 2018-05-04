@@ -97,52 +97,78 @@ def getRandomTesting(train_X,train_Y, porcentage):
     validation_label = np.delete(train_Y, testDataSelected, 0)
     return test_data, test_label, validation_data, validation_label
 
+def getAccuracy(X, Y):
+    aciertos = 0
+    for i in range(len(X)):
+        if (np.argmax(X[i]) == np.argmax(Y[i])):
+            aciertos += 1
+    return float((aciertos*100)/len(X))
+
+def OneHotEncode(Y):
+    #One Hot Encoding
+    Y_vectorizado = np.zeros((len(Y), 10))              #Creacion de labels vectorizados para mandarlos a cross-entropy (10 columnas->10 clases)
+    for i in range(len(Y)):                     
+        Y_vectorizado[i][int(Y[i])] = 1                 #Se pone 1.0 en la posicion del vector
+    return Y_vectorizado
+    
 def Train():
     cantTrain = 32        #Número de imágenes del train que se usarán como test
-    
     data = load_MNIST_Data()
     train_X = data[0]       #imagenes de entrenamiento (60000)
     train_Y = data[1]       #Labeld de entrenamiento (60000)
     test_X = data[2]        #Imagenes de prueba (10000)
     test_Y = data[3]        #Labels de prueba (10000)
-
+    
     #se calcula el 80 del total de los datos,
     #retorna una lista con imagenes de train(80%) y sus labels y imagenes de validacion(20%) y sus labels
     dataPorcentage = getRandomTesting(train_X,train_Y,0.8)
+    
     train_X = dataPorcentage[0]
+    train_X_aux = dataPorcentage[0]
     train_Y = dataPorcentage[1]
+    train_Y_aux = dataPorcentage[1]
+    
     validation_X = dataPorcentage[2]                    
-    validation_Y = dataPorcentage[3]  
-
+    validation_Y = dataPorcentage[3] 
+    epocs = 6
     NN = Neural_Network()
-    
-    for i in range(1500):
-        trainRandom = random.sample(range(len(train_X)),cantTrain)                       #toma los índices aleatoriamente para las imágenes de training
-        X = np.array([train_X[i] for i in trainRandom]) / 255                                 #Datos de testing con los índices anteriores
-        Y = [train_Y[i] for i in trainRandom]                                            #labels de los datos anteriores
-
-        #Elimina las posiciones que ya fueron utilizadas
-        train_X = np.delete(train_X, trainRandom, 0)
-        train_Y = np.delete(train_Y, trainRandom, 0)
-
-        #One Hot Encoding
-        Y_vectorizado = np.zeros((len(Y), 10))              #Creacion de labels vectorizados para mandarlos a cross-entropy (10 columnas->10 clases)
-        for i in range(len(Y)):                     
-            Y_vectorizado[i][int(Y[i])] = 1                 #Se pone 1.0 en la posicion del vector
-        NN.y = Y_vectorizado
-    
-        output = NN.forward(X)
-
-        print("Forward")
-        #print(output)
-
-        ce = NN.cross_entropy(output, Y_vectorizado)
-        print ce
+    for i in range(epocs):
+        print("EPOC #"+str(i))
+        train_X = train_X_aux
+        train_Y = train_Y_aux
         
-        NN.backward(X, ce, output)
+        for i in range(1500):
+            #print("Iteracion #"+str(i))
+            trainRandom = random.sample(range(len(train_X)),cantTrain)                       #toma los índices aleatoriamente para las imágenes de training
+            X = np.array([train_X[i] for i in trainRandom]) / 255                                 #Datos de testing con los índices anteriores
+            Y = [train_Y[i] for i in trainRandom]                                            #labels de los datos anteriores
+
+            #Elimina las posiciones que ya fueron utilizadas
+            train_X = np.delete(train_X, trainRandom, 0)
+            train_Y = np.delete(train_Y, trainRandom, 0)
+
+            #OneHotEncode
+            NN.y = OneHotEncode(Y)
+        
+            output = NN.forward(X)
+            
+            #print("Exactitud "+str(getAccuracy(output,NN.y)))
+            #print("Forward")
+            #print(output)
+
+            ce = NN.cross_entropy(output, NN.y)
+            #print ce
+            
+            NN.backward(X, ce, output)
 
 
-    
+    test_X  = test_X / 255
+    NN.y = OneHotEncode(test_Y)
+    print("Analisis final")
+    output = NN.forward(test_X)
+    ce = NN.cross_entropy(output, NN.y)
+    print("Loss "+str(ce))
+    print("Exactitud "+str(getAccuracy(output,NN.y)))
     
 
 
