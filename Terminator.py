@@ -46,12 +46,12 @@ class Neural_Network(object):
     def forward(self, X):
         self.z = np.dot(X, self.W1)
         self.z2 = self.relu(self.z)                                          # activation function capa 1
-        self.maskHidden1 = np.random.rand(*self.z2.shape) < self.probDrop    # Se crea máscara para cerrar unidades de la capa
-        self.z2 *= self.maskHidden1                                          # Se cierran las unidades de la capa 
+        print "VIEJO: ",self.z2
+        self.z2 = self.dropout(self.z2,1)                                    #DropOut a la capa oculta 1
+        print "NUEVO: ",self.z2
         self.z3 = np.dot(self.z2,self.W2) 
         self.z4 = self.relu(self.z3)                                         # activation function capa 2
-        self.maskHidden2 = np.random.rand(*self.z4.shape) < self.probDrop
-        self.z4 *= self.maskHidden2 
+        self.z4 = self.dropout(self.z4,2)                                    #DropOut a la capa oculta 2
         self.z5 = np.dot(self.z4,self.W3)                                    # final activation function
         output = self.softmax(self.z5)
         return output
@@ -70,8 +70,15 @@ class Neural_Network(object):
         self.W3 += self.learningRate*(self.z4.T.dot(self.output_delta))                          #ajusta pesos (hidden2->output)
 
 
-    def dropout(self, capa):
+    def dropout(self, capa, hidden):
         labelsDrop = random.sample(range(len(capa)),(int)(round(len(capa)/2)))                   #Saca el 50% de la capa
+        capa[labelsDrop] = np.dot(capa[labelsDrop],0)
+        if hidden == 1:
+            self.maskHidden1 = labelsDrop
+        else:
+            self.maskHidden2 = labelsDrop
+        return capa
+        
         
         
         
