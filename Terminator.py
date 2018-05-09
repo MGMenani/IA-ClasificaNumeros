@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import random
 import os.path as path
+import pickle
 from math import sqrt
 from sklearn.preprocessing import normalize 
 
@@ -34,13 +35,12 @@ class Neural_Network(object):
         self.maskHidden2 = []               #Máscara para dropout de la capa oculta 2 
 
         #inicializo el W con pesos aleatorios con Xavier
-        #if path.exists("Pesos.txt"):
-        #    print "Sí existe"
-        #    self.cargarPesos()
-        #    return 0
-        self.W1 = np.random.randn(self.inputSize, self.hiddenSize1) / sqrt(self.inputSize)# (784, 512) entrada
-        self.W2 = np.random.randn(self.hiddenSize1, self.hiddenSize2) / sqrt(self.hiddenSize1)   # (512, 128) primera capa
-        self.W3 = np.random.randn(self.hiddenSize2, self.outputSize) / sqrt(self.hiddenSize2)   # (128, 10)  segunda capa
+        if path.exists("Pesos.pkl"):
+            self.cargarPesos()
+        else:
+            self.W1 = np.random.randn(self.inputSize, self.hiddenSize1) / sqrt(self.inputSize)# (784, 512) entrada
+            self.W2 = np.random.randn(self.hiddenSize1, self.hiddenSize2) / sqrt(self.hiddenSize1)   # (512, 128) primera capa
+            self.W3 = np.random.randn(self.hiddenSize2, self.outputSize) / sqrt(self.hiddenSize2)   # (128, 10)  segunda capa
         self.y = None
         
     def forward(self, X):
@@ -70,10 +70,8 @@ class Neural_Network(object):
         self.W3 += self.learningRate*(self.z4.T.dot(self.output_delta))                          #ajusta pesos (hidden2->output)
 
 
-    #No tan necesario hacerlo por aparte
-    #def dropout(self, capa):
-    #    #print "round: ", round(len(capa)/2) 
-    #    labelsDrop = random.sample(range(len(capa)),(int)(round(len(capa)/2)))                                    #Saca el 50% de la capa
+    def dropout(self, capa):
+        labelsDrop = random.sample(range(len(capa)),(int)(round(len(capa)/2)))                   #Saca el 50% de la capa
         
         
         
@@ -108,32 +106,16 @@ class Neural_Network(object):
         return self.y - X
 
     def guardarPesos(self):
-        archivo = open("Pesos.txt","w")
-        archivo.write(str(self.W1))
-        archivo.write('\n')
-        archivo.write(str(self.W2))
-        archivo.write('\n')
-        archivo.write(str(self.W3))
-        
-        #for i in self.W1:
-        #    for j in i:
-        #        archivo.write(str(j))
-        #    archivo.write('\n')
-        #archivo.append(str(self.W2))
-        #archivo.append(str(self.W3))
-        archivo.close()
+        dic = {"W1":self.W1,"W2":self.W2,"W3":self.W3}
+        with open("Pesos.pkl", "wb") as f:
+            pickle.dump(dic,f,protocol=pickle.HIGHEST_PROTOCOL)
 
     def cargarPesos(self):
-        with open("Pesos.txt", "r") as file:
-            cont = file.read().replace('[0-9]\\n',)               #Devuelve todo el contenido el archivo
-            #array = eval(cont)
-            peso = 1
-            for i in cont:
-                return 
-                
-            
-        
-                       
+        with open("Pesos.pkl", "rb") as f:
+            pesos = pickle.load(f)
+            self.W1 = pesos["W1"]
+            self.W2 = pesos["W2"]
+            self.W3 = pesos["W3"]                      
 
 def getRandomTesting(train_X,train_Y, porcentage):
     test_data = []
