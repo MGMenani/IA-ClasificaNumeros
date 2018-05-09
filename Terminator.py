@@ -3,11 +3,16 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import random
+import os.path as path
+from math import sqrt
+from sklearn.preprocessing import normalize 
 
 from sklearn.datasets import fetch_mldata
 mnist = fetch_mldata('MNIST original')
 
 from sklearn.model_selection import train_test_split
+
+np.set_printoptions(threshold='nan')               #Para poder imprimir los arrays completos sin puntos suspensivos 
 
 ################ Load Data section ##################
 def load_MNIST_Data():
@@ -22,57 +27,113 @@ class Neural_Network(object):
         self.inputSize = 784                #Imágenes de 28x28 
         self.outputSize = 10                #números del 0 al 9
         self.hiddenSize1 = 512              #Primera capa de 512
-        self.hiddenSize2 = 128              #Segunda capa de 128
+        self.hiddenSize2 = 128             #Segunda capa de 128
+        self.learningRate = 0.0085
+        self.probDrop = 0.5                 #Probabilidad de mantener unidad activa en dropout. Más alto = menos drop
+        self.maskHidden1 = []               #Máscara para dropout de la capa oculta 1
+        self.maskHidden2 = []               #Máscara para dropout de la capa oculta 2 
 
-        #inicializo el W con pesos aleatorios 
-        self.W1 = np.random.randn(self.inputSize, self.hiddenSize1)     # (784, 512) entrada
-        self.W2 = np.random.randn(self.hiddenSize1, self.hiddenSize2)   # (512, 128) primera capa
-        self.W3 = np.random.randn(self.hiddenSize2, self.outputSize)    # (128, 10)  segunda capa
+        #inicializo el W con pesos aleatorios con Xavier
+        #if path.exists("Pesos.txt"):
+        #    print "Sí existe"
+        #    self.cargarPesos()
+        #    return 0
+        self.W1 = np.random.randn(self.inputSize, self.hiddenSize1) / sqrt(self.inputSize)# (784, 512) entrada
+        self.W2 = np.random.randn(self.hiddenSize1, self.hiddenSize2) / sqrt(self.hiddenSize1)   # (512, 128) primera capa
+        self.W3 = np.random.randn(self.hiddenSize2, self.outputSize) / sqrt(self.hiddenSize2)   # (128, 10)  segunda capa
+        self.y = None
         
     def forward(self, X):
         self.z = np.dot(X, self.W1)
-        self.z2 = self.relu(self.z)                     # activation function capa 1
+        self.z2 = self.relu(self.z)                                          # activation function capa 1
+        self.maskHidden1 = np.random.rand(*self.z2.shape) < self.probDrop    # Se crea máscara para cerrar unidades de la capa
+        self.z2 *= self.maskHidden1                                          # Se cierran las unidades de la capa 
         self.z3 = np.dot(self.z2,self.W2) 
-        self.z4 = self.relu(self.z3)                    # activation function capa 2
-        self.z5 = np.dot(self.z4,self.W3)
-        output = self.relu(self.z5)                     # final activation function
+        self.z4 = self.relu(self.z3)                                         # activation function capa 2
+        self.maskHidden2 = np.random.rand(*self.z4.shape) < self.probDrop
+        self.z4 *= self.maskHidden2 
+        self.z5 = np.dot(self.z4,self.W3)                                    # final activation function
+        output = self.softmax(self.z5)
         return output
 
-    def backward(self, X, y, output):
-        self.output_error = y - output
-        self.output_delta = self.output_error * self.derivate_relu(output)
-
+    def backward(self, X, loss, output):
+        self.output_delta = loss * self.grad_CrossEntropy_Softmax(output)
+        
         self.z4_error = self.output_delta.dot(self.W3.T)
         self.z4_delta = self.z4_error*self.derivate_relu(self.z4)
+
         self.z2_error = self.z4_delta.dot(self.W2.T)
         self.z2_delta = self.z2_error*self.derivate_relu(self.z2)
-
-        self.W1 += X.T.dot(self.z2_delta)                                    #ajusta pesos (input->hidden1)
-        self.W2 += self.z2.T.dot(self.z4_delta)                              #ajusta pesos (hidden1->hidden2)
-        self.W3 += self.z4.T.dot(self.output_delta)                          #ajusta pesos (hidden2->output)
         
+        self.W1 += self.learningRate*(X.T.dot(self.z2_delta))                                    #ajusta pesos (input->hidden1)
+        self.W2 += self.learningRate*(self.z2.T.dot(self.z4_delta))                              #ajusta pesos (hidden1->hidden2)
+        self.W3 += self.learningRate*(self.z4.T.dot(self.output_delta))                          #ajusta pesos (hidden2->output)
 
+
+    #No tan necesario hacerlo por aparte
+    #def dropout(self, capa):
+    #    #print "round: ", round(len(capa)/2) 
+    #    labelsDrop = random.sample(range(len(capa)),(int)(round(len(capa)/2)))                                    #Saca el 50% de la capa
+        
+        
+        
     def relu(self,x):
-        return np.maximum(x, 0, x)
+        return np.maximum(x, 0, x) #x * (x > 0) #np.maximum(x, 0, x)
 
     def derivate_relu(self,x):
-        return np.heaviside(x, 0)
+        return 1 * (x > 0) #np.heaviside(x, 0)
         
     #https://deepnotes.io/softmax-crossentropy
     def softmax(self, X):
-        exps = np.exp(X)                      #calcula cada e**Xi (de cada elemento de la matriz)
-        return exps / np.sum(exps)
+        exp_scores = np.exp(X - np.max(X, axis=-1, keepdims=True))
+        return exp_scores / np.sum(exp_scores, axis=-1, keepdims=True)
+##        X -= np.max(X)
+##        exps = np.exp(X) + np.finfo(float).eps                     #calcula cada e**Xi (de cada elemento de la matriz)
+##        suma = np.sum(exps,1) 
+##        return exps / suma[:,None]
+        
+    
+    def cross_entropy(self,p,y):
+        return np.mean(np.sum(np.nan_to_num(-y * np.log(p) - (1 - y) * np.log(1 - p)), axis = 1))
+##        m = y.shape[0]
+##        log_likelihood = -np.log(p)
+##        loss = np.sum(log_likelihood) / m
+##        return loss
 
-    def cross_entropy(self,X,y):
-        """
-        X is the output from fully connected layer (num_examples x num_classes)
-        y is labels (num_examples x 1)
-        """
-        m = y.shape[0]
-        p = self.softmax(X)
-        log_likelihood = -np.log(p)#[range(m),y])
-        loss = np.sum(log_likelihood) / m
-        return loss
+    def grad_CrossEntropy_Softmax(self,X):
+##        num_examples = X.shape[0]
+##        probs = X
+##        probs[range(num_examples), np.argmax(self.y)] -= 1
+##        return probs
+        return self.y - X
+
+    def guardarPesos(self):
+        archivo = open("Pesos.txt","w")
+        archivo.write(str(self.W1))
+        archivo.write('\n')
+        archivo.write(str(self.W2))
+        archivo.write('\n')
+        archivo.write(str(self.W3))
+        
+        #for i in self.W1:
+        #    for j in i:
+        #        archivo.write(str(j))
+        #    archivo.write('\n')
+        #archivo.append(str(self.W2))
+        #archivo.append(str(self.W3))
+        archivo.close()
+
+    def cargarPesos(self):
+        with open("Pesos.txt", "r") as file:
+            cont = file.read().replace('[0-9]\\n',)               #Devuelve todo el contenido el archivo
+            #array = eval(cont)
+            peso = 1
+            for i in cont:
+                return 
+                
+            
+        
+                       
 
 def getRandomTesting(train_X,train_Y, porcentage):
     test_data = []
@@ -86,50 +147,84 @@ def getRandomTesting(train_X,train_Y, porcentage):
     validation_label = np.delete(train_Y, testDataSelected, 0)
     return test_data, test_label, validation_data, validation_label
 
-def Train():
-    cantTrain = 35          #Número de imágenes del train que se usarán como test
+def getAccuracy(X, Y):
+    aciertos = 0
+    for i in range(len(X)):
+        if (np.argmax(X[i]) == np.argmax(Y[i])):
+            aciertos += 1
+    return float((aciertos*100)/len(X))
+
+def OneHotEncode(Y):
+    #One Hot Encoding
+    Y_vectorizado = np.zeros((len(Y), 10))              #Creacion de labels vectorizados para mandarlos a cross-entropy (10 columnas->10 clases)
+    for i in range(len(Y)):                     
+        Y_vectorizado[i][int(Y[i])] = 1                 #Se pone 1.0 en la posicion del vector
+    return Y_vectorizado
     
+def Train():
+    cantTrain = 32        #Número de imágenes del train que se usarán como test
     data = load_MNIST_Data()
     train_X = data[0]       #imagenes de entrenamiento (60000)
     train_Y = data[1]       #Labeld de entrenamiento (60000)
     test_X = data[2]        #Imagenes de prueba (10000)
     test_Y = data[3]        #Labels de prueba (10000)
-
+    
     #se calcula el 80 del total de los datos,
     #retorna una lista con imagenes de train(80%) y sus labels y imagenes de validacion(20%) y sus labels
     dataPorcentage = getRandomTesting(train_X,train_Y,0.8)
-    train_X = dataPorcentage[0]
-    train_Y = dataPorcentage[1]
+
+    train_X_aux = dataPorcentage[0]
+    train_Y_aux = dataPorcentage[1]
+    
     validation_X = dataPorcentage[2]                    
-    validation_Y = dataPorcentage[3]  
-    
-    trainRandom = random.sample(range(len(train_X)),cantTrain)                       #toma los índices aleatoriamente para las imágenes de training
-    X = np.array([train_X[i] for i in trainRandom])                                  #Datos de testing con los índices anteriores
-    Y = [train_Y[i] for i in trainRandom]                                          #labels de los datos anteriores
-
-    #Elimina las posiciones que ya fueron utilizadas
-    train_X = np.delete(train_X, trainRandom, 0)
-    train_Y = np.delete(train_Y, trainRandom, 0)
-
-    #One Hot Encoding
-    Y_vectorizado = np.zeros((len(Y), 10))              #Creacion de labels vectorizados para mandarlos a cross-entropy (10 columnas->10 clases)
-    for i in range(len(Y)):                     
-        Y_vectorizado[i][int(Y[i])] = 1                 #Se pone 1.0 en la posicion del vector
-
+    validation_Y = dataPorcentage[3] 
+    epocs = 1
     NN = Neural_Network()
-    output = NN.forward(X)
+    for i in range(epocs):
+        print("EPOC #"+str(i))
+        train_X = train_X_aux
+        train_Y = train_Y_aux
+        
+        for i in range(1500):
+            trainRandom = random.sample(range(len(train_X)),cantTrain)                   #toma los índices aleatoriamente para las imágenes de training
+            X = np.array([train_X[i] for i in trainRandom]) / 255                            #Datos de testing con los índices anteriores
+            Y = [train_Y[i] for i in trainRandom]                                            #labels de los datos anteriores
 
-    NN.backward(X,Y_vectorizado,output)
+            #Elimina las posiciones que ya fueron utilizadas
+            train_X = np.delete(train_X, trainRandom, 0)
+            train_Y = np.delete(train_Y, trainRandom, 0)
 
+            #OneHotEncode
+            NN.y = OneHotEncode(Y)
+        
+            output = NN.forward(X)
+            
+            #print("Exactitud "+str(getAccuracy(output,NN.y)))
+            #print("Forward")
+            #print(output)
+
+            ce = NN.cross_entropy(output, NN.y)
+            #print ce
+            
+            NN.backward(X, ce, output)
+
+        print("Loss "+str(ce))
+        print("Exactitud "+str(getAccuracy(output,NN.y)))
+
+        NN.guardarPesos()
+
+
+    test_X  = test_X / 255
+    NN.y = OneHotEncode(test_Y)
+    print("Analisis final")
+    output = NN.forward(test_X)
+    ce = NN.cross_entropy(output, NN.y)
+    print("Loss "+str(ce))
+    print("Exactitud "+str(getAccuracy(output,NN.y)))
     
-    #Calcular el Loss al final de cada entrenamiento
-    output = output + 0.001                             #evitar división entre 0 se le suma a todos 0.001
-    output = output/np.amax(output, axis=0)
-    ce = NN.cross_entropy(output, Y_vectorizado)
 
-    
 
-    print ce
 
     
 Train()
+        
