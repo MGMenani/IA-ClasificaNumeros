@@ -78,10 +78,10 @@ class Neural_Network(object):
         return capa     
         
     def relu(self,x):
-        return np.maximum(x, 0, x) #x * (x > 0) #np.maximum(x, 0, x)
+        return np.maximum(x, 0, x)  #O tambien x * (x > 0) #np.maximum(x, 0, x)
 
     def derivate_relu(self,x):
-        return np.heaviside(x, 0)#1 * (x > 0) 
+        return np.heaviside(x, 0)   #O tambien 1 * (x > 0) 
         
     #https://deepnotes.io/softmax-crossentropy
     def softmax(self, X):
@@ -140,8 +140,8 @@ def getAccuracy(X, Y):
             aciertos += 1
     return float((aciertos*100)/len(X))
 
+#One Hot Encoding
 def OneHotEncode(Y):
-    #One Hot Encoding
     Y_vectorizado = np.zeros((len(Y), 10))              #Creacion de labels vectorizados para mandarlos a cross-entropy (10 columnas->10 clases)
     for i in range(len(Y)):                     
         Y_vectorizado[i][int(Y[i])] = 1                 #Se pone 1.0 en la posicion del vector
@@ -151,7 +151,7 @@ def Train():
     loss = []
     accuracy = []
     
-    cantTrain = 32        #Número de imágenes del train que se usarán como test
+    cantTrain = 32          #Número de imágenes del train que se usarán como test
     data = load_MNIST_Data()
     train_X = data[0]       #imagenes de entrenamiento (60000)
     train_Y = data[1]       #Labeld de entrenamiento (60000)
@@ -195,7 +195,6 @@ def Train():
             NN.backward(X, ce, output)
 
             if (k%100 == 0):
-                #validation_X  = validation_X / 255
                 NN.y = OneHotEncode(validation_Y)
                 output = NN.forward(validation_X)
                 ce = NN.cross_entropy(output, NN.y)
@@ -204,10 +203,6 @@ def Train():
                 accuracy += [efectividad]
                 print("Loss "+str(ce))
                 print("Exactitud "+str(getAccuracy(output,NN.y)))
-
-            
-            
-            
 
         #NN.guardarPesos()
 
@@ -230,11 +225,6 @@ def Train():
     plt.subplot(212)
     plt.plot(accuracy)
     plt.show()
-
-    
-
-
-
-    
+   
 Train()
         
