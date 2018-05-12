@@ -49,9 +49,11 @@ class Neural_Network(object):
     def forward(self, X):
         self.z = np.dot(X, self.W1)
         self.z2 = self.relu(self.z)                                          # activation function capa 1
+        #self.z2 = batchNormalization(self.z2)
         #self.z2 = self.dropout(self.z2,1)                                    #DropOut a la capa oculta 1
         self.z3 = np.dot(self.z2,self.W2) 
         self.z4 = self.relu(self.z3)                                         # activation function capa 2
+        #self.z4 = batchNormalization(self.z4)
         #self.z4 = self.dropout(self.z4,2)                                    #DropOut a la capa oculta 2
         self.z5 = np.dot(self.z4,self.W3)                                    # final activation function
         output = self.softmax(self.z5)
@@ -64,6 +66,7 @@ class Neural_Network(object):
         self.z4_delta = self.z4_error*self.derivate_relu(self.z4)
 
         self.z2_error = self.z4_delta.dot(self.W2.T)
+        #self.z2_error = self.z2_error.dot(self.maskHidden1)
         self.z2_delta = self.z2_error*self.derivate_relu(self.z2)
         
         self.W1 += self.learningRate*(X.T.dot(self.z2_delta))                                    #ajusta pesos (input->hidden1)
@@ -159,6 +162,13 @@ def OneHotEncode(Y):
     for i in range(len(Y)):                     
         Y_vectorizado[i][int(Y[i])] = 1                 #Se pone 1.0 en la posicion del vector
     return Y_vectorizado
+
+def varianza(X):
+    sumatoria = sum((X-np.mean(X))**2)
+    return sumatoria/len(X.ravel())
+
+def batchNormalization(X):
+    return (X-np.mean(X))/np.sqrt(varianza(X)+0.0000000001)
     
 def Train():
     loss = []
@@ -174,14 +184,14 @@ def Train():
     
     #se calcula el 80 del total de los datos,
     #retorna una lista con imagenes de train(80%) y sus labels y imagenes de validacion(20%) y sus labels
-    epocs = 30
+    epocs = 5
     NN = Neural_Network()
 
     while (True):
         opcion = menu()
 
-        if opcion == 1:
-            for j in range(epocs):
+        if opcion == 1:                                                                 #Entrenar el modelo
+            for j in range(epocs):                                                      #Entrenar varias veces con las mismas imágenes (epochs)
                 dataPorcentage = getRandomTesting(train_X,train_Y,0.8)
 
                 train_X_aux = dataPorcentage[0]
@@ -192,11 +202,13 @@ def Train():
         
                 print("EPOC #"+str(j))
                 cont = 0
-                for k in range(1500):
+                for k in range(1500):                                                   #Iteraciones para entrenar con todas las imágenes
                     cont+=1
-                    trainRandom = random.sample(range(len(train_X_aux)),cantTrain)                   #toma los índices aleatoriamente para las imágenes de training
-                    X = np.array([train_X_aux[i] for i in trainRandom]) / 255                            #Datos de testing con los índices anteriores
-                    Y = [train_Y_aux[i] for i in trainRandom]                                            #labels de los datos anteriores
+                    trainRandom = random.sample(range(len(train_X_aux)),cantTrain)      #toma los índices aleatoriamente para las imágenes de training
+                    X = np.array([train_X_aux[i] for i in trainRandom]) / 255           #Datos de entrenamiento con los índices anteriores
+                    Y = [train_Y_aux[i] for i in trainRandom]                           #labels de los datos anteriores
+
+                    #X = batchNormalization(X)
 
                     #Elimina las posiciones que ya fueron utilizadas
                     train_X_aux = np.delete(train_X_aux, trainRandom, 0)
@@ -244,13 +256,14 @@ def Train():
             plt.plot(accuracy)
             plt.show()
         
-        elif opcion == 2:                                      #Clasificar imágenes hechas a mano
+        elif opcion == 2:                                        #Clasificar imágenes hechas a mano(blancas con fondo negro)
             Tk().withdraw()
             pathString = askopenfilename()
             if pathString != "":
                 f = Image.open(pathString)
-                image = f.convert('L')                           # convert image to monochrome
+                image = f.convert('L')                           #convert image to monochrome
                 image = np.array(image).ravel()
+                #image = abs(image-255)                          #Cuando las imágenes son negras con fondo blanco
                 print "Se clasificó un ",NN.clasificar(image)
 
         else:
