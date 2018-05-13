@@ -30,16 +30,16 @@ class Neural_Network(object):
     def __init__(self):
         self.inputSize = 784                #Imágenes de 28x28 
         self.outputSize = 10                #números del 0 al 9
-        self.hiddenSize1 = 128              #Primera capa de 512
-        self.hiddenSize2 = 128             #Segunda capa de 128
+        self.hiddenSize1 = 1024              #Primera capa de 512
+        self.hiddenSize2 = 512             #Segunda capa de 128
         self.learningRate = 0.0085
         self.probDrop = 0.5                 #Probabilidad de mantener unidad activa en dropout. Más alto = menos drop
-        self.maskHidden1 = []               #Máscara para dropout de la capa oculta 1
-        self.maskHidden2 = []               #Máscara para dropout de la capa oculta 2 
+        self.maskHidden1 = []               #Máscara con las posiciones para dropout de la capa oculta 1
+        self.maskHidden2 = []               #Máscara con las posiciones para dropout de la capa oculta 2 
 
         #inicializo el W con pesos aleatorios con Xavier
         if path.exists("Pesos.pkl"):
-            self.cargarPesos()
+            self.cargarPesos("Pesos.pkl")
         else:
             self.W1 = np.random.randn(self.inputSize, self.hiddenSize1) / sqrt(self.inputSize)# (784, 512) entrada
             self.W2 = np.random.randn(self.hiddenSize1, self.hiddenSize2) / sqrt(self.hiddenSize1)   # (512, 128) primera capa
@@ -48,13 +48,16 @@ class Neural_Network(object):
         
     def forward(self, X):
         self.z = np.dot(X, self.W1)
+        #self.z = batchNormalization(self.z)
         self.z2 = self.relu(self.z)                                          # activation function capa 1
-        #self.z2 = batchNormalization(self.z2)
         #self.z2 = self.dropout(self.z2,1)                                    #DropOut a la capa oculta 1
-        self.z3 = np.dot(self.z2,self.W2) 
+        
+        self.z3 = np.dot(self.z2,self.W2)
+        #self.z3 = batchNormalization(self.z3)
         self.z4 = self.relu(self.z3)                                         # activation function capa 2
         #self.z4 = batchNormalization(self.z4)
         #self.z4 = self.dropout(self.z4,2)                                    #DropOut a la capa oculta 2
+        
         self.z5 = np.dot(self.z4,self.W3)                                    # final activation function
         output = self.softmax(self.z5)
         return output
@@ -66,17 +69,39 @@ class Neural_Network(object):
         self.z4_delta = self.z4_error*self.derivate_relu(self.z4)
 
         self.z2_error = self.z4_delta.dot(self.W2.T)
-        #self.z2_error = self.z2_error.dot(self.maskHidden1)
         self.z2_delta = self.z2_error*self.derivate_relu(self.z2)
         
         self.W1 += self.learningRate*(X.T.dot(self.z2_delta))                                    #ajusta pesos (input->hidden1)
         self.W2 += self.learningRate*(self.z2.T.dot(self.z4_delta))                              #ajusta pesos (hidden1->hidden2)
         self.W3 += self.learningRate*(self.z4.T.dot(self.output_delta))                          #ajusta pesos (hidden2->output)
 
+    def backwardPruebas(self, X, loss, output):
+        self.output_delta = loss * self.grad_CrossEntropy_Softmax(output)
+        
+        self.z4_error = self.output_delta.dot(self.W3.T)
+        self.z4_delta = self.z4_error*self.derivate_relu(self.z4)
+
+        
+        #self.z4_delta[self.maskHidden1] = np.dot(self.z4_delta[self.maskHidden1],0)
+        self.z2_error = self.z4_delta.dot(self.W2.T)
+        #self.z2_error[self.maskHidden1] = np.dot(self.z2_error[self.maskHidden1],0)
+        self.z2_delta = self.z2_error*self.derivate_relu(self.z2)
+        #self.z2_delta[self.maskHidden1] = np.dot(self.z2_delta[self.maskHidden1],0)
+
+        #W2_old = self.W2
+        
+        self.W1 += self.learningRate*(X.T.dot(self.z2_delta))                                    #ajusta pesos (input->hidden1)
+        self.W2 += self.learningRate*(self.z2.T.dot(self.z4_delta))                              #ajusta pesos (hidden1->hidden2)
+        #self.W2[self.maskHidden1] = W2_old[self.maskHidden1]
+        self.W3 += self.learningRate*(self.z4.T.dot(self.output_delta))                          #ajusta pesos (hidden2->output)
+   
+
 
     def dropout(self, capa, hidden):
         labelsDrop = random.sample(range(len(capa)),(int)(round(len(capa)/2)))                   #Saca el 50% de la capa
+        #mask =
         capa[labelsDrop] = np.dot(capa[labelsDrop],0)
+         
         if hidden == 1:
             self.maskHidden1 = labelsDrop
         else:
@@ -120,14 +145,15 @@ class Neural_Network(object):
         with open("Pesos.pkl", "wb") as f:
             pickle.dump(dic,f,protocol=pickle.HIGHEST_PROTOCOL)
 
-    def cargarPesos(self):
-        with open("Pesos.pkl", "rb") as f:
+    def cargarPesos(self, archivo):
+        with open(archivo, "rb") as f:
             pesos = pickle.load(f)
             self.W1 = pesos["W1"]
             self.W2 = pesos["W2"]
             self.W3 = pesos["W3"]
 
     def clasificar(self, X):
+        #X = batchNormalization(X)
         self.z = np.dot(X, self.W1)
         self.z2 = self.relu(self.z)                                          # activation function capa 1
         self.z3 = np.dot(self.z2,self.W2) 
@@ -165,7 +191,7 @@ def OneHotEncode(Y):
 
 def varianza(X):
     sumatoria = sum((X-np.mean(X))**2)
-    return sumatoria/len(X.ravel())
+    return sumatoria/len(X)
 
 def batchNormalization(X):
     return (X-np.mean(X))/np.sqrt(varianza(X)+0.0000000001)
@@ -184,7 +210,7 @@ def Train():
     
     #se calcula el 80 del total de los datos,
     #retorna una lista con imagenes de train(80%) y sus labels y imagenes de validacion(20%) y sus labels
-    epocs = 5
+    epocs = 10
     NN = Neural_Network()
 
     while (True):
@@ -257,21 +283,28 @@ def Train():
             plt.show()
         
         elif opcion == 2:                                        #Clasificar imágenes hechas a mano(blancas con fondo negro)
-            Tk().withdraw()
-            pathString = askopenfilename()
-            if pathString != "":
-                f = Image.open(pathString)
-                image = f.convert('L')                           #convert image to monochrome
-                image = np.array(image).ravel()
-                #image = abs(image-255)                          #Cuando las imágenes son negras con fondo blanco
-                print "Se clasificó un ",NN.clasificar(image)
+            buscarPesos = Tk()
+            buscarPesos.withdraw()
+            pesos = askopenfilename(filetypes=[('.pkl files', '.pkl')], title = "Abra el archivo con los pesos")
+            NN.cargarPesos(pesos)
+
+            pathString = " "
+            while pathString != "":
+                Tk().withdraw()
+                pathString = askopenfilename(initialdir = "ImagenesClasificar",filetypes=[('jpg files', '.jpg'),('png files','.png')], title = "Elija la imagen que desea clasificar")
+                if pathString != "":
+                    f = Image.open(pathString)
+                    image = f.convert('L')                           #convert image to monochrome
+                    image = np.array(image).ravel() / 255
+                    #image = abs(image-255)                          #Cuando las imágenes son negras con fondo blanco
+                    print "Se clasificó un ",NN.clasificar(image)
 
         else:
             print "Opción incorrecta\n"
 
 
 def menu():
-    print "------- MENÚ -------"
+    print "\n------- MENÚ -------"
     print "1) Entrenar modelo"
     print "2) Clasificar"
     print "Elija una opción:"
