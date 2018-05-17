@@ -32,7 +32,7 @@ class Neural_Network(object):
         self.outputSize = 10                #números del 0 al 9
         self.hiddenSize1 = 1024              #Primera capa de 512
         self.hiddenSize2 = 512             #Segunda capa de 128
-        self.learningRate = 0.0085
+        self.learningRate = 0.01
         self.probDrop = 0.5                 #Probabilidad de mantener unidad activa en dropout. Más alto = menos drop
         self.maskHidden1 = []               #Máscara con las posiciones para dropout de la capa oculta 1
         self.maskHidden2 = []               #Máscara con las posiciones para dropout de la capa oculta 2 
@@ -173,7 +173,7 @@ def Train():
     
     #se calcula el 80 del total de los datos,
     #retorna una lista con imagenes de train(80%) y sus labels y imagenes de validacion(20%) y sus labels
-    epocs = 6
+    epocs = 1
     NN = Neural_Network()
     while (True):
         opcion = menu()
@@ -231,9 +231,15 @@ def Train():
             plt.figure(1)
             plt.subplot(211)
             plt.plot(loss)
+            plt.ylabel('Loss')
+            plt.grid(True)
     
             plt.subplot(212)
             plt.plot(accuracy)
+
+            plt.xlabel('Iteration')
+            plt.ylabel('Accuracy')
+            plt.grid(True)                   
             plt.show()
 
             #Si se quiere que se comiencen a descarga las imagenes quitar el comentario
